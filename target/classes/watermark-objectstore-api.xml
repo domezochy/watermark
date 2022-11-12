@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="29357a8b-82e1-428f-8a84-af7757f4959c" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}" />
+	</db:config>
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="1adb95de-08e0-4acf-9d17-627a0f120a32" />
+	<configuration-properties doc:name="Configuration properties" doc:id="67cc412f-ccdf-4f1c-84e2-651f72b259dc" file="properties/dev-config.yaml" />
+	<flow name="watermark-objectstore-apiFlow" doc:id="2aee1e4c-d020-4835-b4f7-f036f4f4e102" >
+		<db:listener doc:id="a92ce880-17c3-45de-96b1-1feedaa040b9" config-ref="Database_Config" table="product" watermarkColumn="product_id" idColumn="product_id">
+			<scheduling-strategy >
+				<fixed-frequency frequency="5000" />
+			</scheduling-strategy>
+		</db:listener>
+		<os:retrieve doc:id="f47a8795-ba45-4110-a348-22b2204c95b4" key="lastproductid" objectStore="Object_store" target="lastproductid">
+			<os:default-value ><![CDATA[0]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="8a5a45a9-3c84-4c00-aedf-6286812a8e59" message="#[vars.value ++ &quot;  &quot; ++ vars.lastproductid ++ ' OUTSIDE CHOICE RETRIEVE']"/>
+		<db:select doc:name="Select" doc:id="edbba5c5-67af-4431-9c04-c49b25538e18" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from product where product_id > :lastproductid]]></db:sql>
+			<db:input-parameters ><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+	lastproductid : vars.lastproductid
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="9498eccf-f0a0-4ef7-8022-55e7f9f3b74a" >
+			<when expression="#[not isEmpty(payload)]">
+				<ee:transform doc:name="Transform Message" doc:id="916e67fd-907a-4280-a7a4-9735cdfb553a" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="a3a16e7c-4cec-4dc8-bf04-315b0ee552b7" message="#[vars.lastproductid ++ &quot;   &quot; ++ vars.value ++ 'IN CHOICE ROUTER']"/>
+				<os:store doc:name="Store" doc:id="58fc4632-b580-49ba-99cf-50b705ebdb9a" key="lastproductid" objectStore="Object_store">
+					<os:value ><![CDATA[#[max(payload.product_id)]]]></os:value>
+				</os:store>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="485b7ea1-a592-487f-b580-50ff5d3717f2" message="NO NEW RECORDS"/>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="0b8ce58b-65b2-4513-9e6f-21da50b94b00" type="ANY">
+				<ee:transform doc:name="Transform Message" doc:id="a39181ca-600b-44e4-89cc-69acb7dd1a10" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : error.description,
+	errordetail : error.detailedDescription
+	
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>
