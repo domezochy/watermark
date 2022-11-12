@@ -20,7 +20,7 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 		<os:retrieve doc:id="f47a8795-ba45-4110-a348-22b2204c95b4" key="lastproductid" objectStore="Object_store" target="lastproductid">
 			<os:default-value ><![CDATA[0]]></os:default-value>
 		</os:retrieve>
-		<logger level="INFO" doc:name="Logger" doc:id="8a5a45a9-3c84-4c00-aedf-6286812a8e59" message="#[vars.value ++ &quot;  &quot; ++ vars.lastproductid ++ ' OUTSIDE CHOICE RETRIEVE']"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8a5a45a9-3c84-4c00-aedf-6286812a8e59" message="after retrive"/>
 		<db:select doc:name="Select" doc:id="edbba5c5-67af-4431-9c04-c49b25538e18" config-ref="Database_Config">
 			<db:sql ><![CDATA[select * from product where product_id > :lastproductid]]></db:sql>
 			<db:input-parameters ><![CDATA[#[%dw 2.0
@@ -40,10 +40,11 @@ output application/json
 payload]]></ee:set-payload>
 					</ee:message>
 				</ee:transform>
-				<logger level="INFO" doc:name="Logger" doc:id="a3a16e7c-4cec-4dc8-bf04-315b0ee552b7" message="#[vars.lastproductid ++ &quot;   &quot; ++ vars.value ++ 'IN CHOICE ROUTER']"/>
+				<logger level="INFO" doc:name="Logger" doc:id="a3a16e7c-4cec-4dc8-bf04-315b0ee552b7" message="NOT EMPTY"/>
 				<os:store doc:name="Store" doc:id="58fc4632-b580-49ba-99cf-50b705ebdb9a" key="lastproductid" objectStore="Object_store">
 					<os:value ><![CDATA[#[max(payload.product_id)]]]></os:value>
 				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="b43bd7a8-1f0e-4359-af10-1304c3e2ac1e" message="AFTER STORE"/>
 			</when>
 			<otherwise >
 				<logger level="INFO" doc:name="Logger" doc:id="485b7ea1-a592-487f-b580-50ff5d3717f2" message="NO NEW RECORDS"/>
